@@ -31,7 +31,7 @@ module  color_mapper (
 	 
 	 //assign palette
 	assign background_palette = '{24'h005000,24'h000000, 24'hf83800, 24'hf0d0b0, 
-				  24'h50ff00, 24'h00ffa8, 24'hb7c70f, 24'hc80000, 
+				  24'h50ff00, 24'h0058f8, 24'hb7c70f, 24'hc80000, 
 				  24'hbcbcbc, 24'h0a8700, 24'hd8ef00, 24'hfc7460, 
 				  24'hfcbcb0, 24'h900000, 24'haeacae, 24'h363301};
 

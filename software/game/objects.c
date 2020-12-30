@@ -106,6 +106,7 @@ void player_status(player_t * player_ptr, player_status_t status){
 }
 
 void bullets_init(){
+	bullets_num = 0;
 	for (int i=0; i<MAX_BULLET_NUM; i++){
 		object_init((object_base_t *)(bullets+i));
 		bullets[i].base.size_x = BULLET_SIZE_X;

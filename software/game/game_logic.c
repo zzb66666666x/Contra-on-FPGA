@@ -71,6 +71,7 @@ void key_events(game_state_t* game_state_ptr){
 	if (keycodes_info.key_pressed){
 		for (int i=0; i<MAX_KEY_USED; i++){
 			cur_key = keycodes_info.keys[i];
+			//printf("%x\n", cur_key);
 			switch (cur_key){
 			case KEY_W:
 				if (*game_state_ptr == IN_GAME){
@@ -189,10 +190,10 @@ void press_w_up(player_t * player_ptr){
 		player_ptr->base.vy = PLAYER_JUMP_INITIAL_VY;
 		break;
 	case JUMP:
-		player_status(player_ptr, JUMP);
+		//player_status(player_ptr, JUMP);
 		break;
 	case JUMP_UP:
-		player_status(player_ptr, JUMP_UP);
+		//player_status(player_ptr, JUMP_UP);
 		break;
 	default :
 		break;
@@ -210,10 +211,10 @@ void press_a_left(player_t * player_ptr){
 		player_status(player_ptr, JUMP);
 		break;
 	case JUMP_UP:
-		player_status(player_ptr, JUMP_UP);
+		//player_status(player_ptr, JUMP_UP);
 		break;
 	case STAND_UP:
-		player_status(player_ptr, STAND_UP);
+		//player_status(player_ptr, STAND_UP);
 		break;
 	default :
 		break;
@@ -269,10 +270,10 @@ void press_d_right(player_t * player_ptr){
 		player_status(player_ptr, JUMP);
 		break;
 	case JUMP_UP:
-		player_status(player_ptr, JUMP_UP);
+		//player_status(player_ptr, JUMP_UP);
 		break;
 	case STAND_UP:
-		player_status(player_ptr, STAND_UP);
+		//player_status(player_ptr, STAND_UP);
 		break;
 	default :
 		break;

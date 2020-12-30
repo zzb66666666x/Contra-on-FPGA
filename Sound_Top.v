@@ -55,7 +55,7 @@ always @(posedge DAC_LR_CLK)
 	if(read_enable) 
 		begin
 		read_counter <= read_counter + 1;
-		if (read_counter == 214198) read_counter <= 0;
+		if (read_counter == 96377) read_counter <= 0;
 		end
 	end
 //============================================
