@@ -1,0 +1,9 @@
+module player1();
+
+endmodule
+
+//nearly the same code 
+module player2();
+
+endmodule
+

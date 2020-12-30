@@ -1,0 +1,192 @@
+module bullets(
+	input Clk,
+	input logic [9:0] bullet_status,
+	input logic [9:0] bullet1_x,
+	input logic [9:0] bullet1_y,
+	input logic [9:0] bullet2_x,
+	input logic [9:0] bullet2_y,
+	input logic [9:0] bullet3_x,
+	input logic [9:0] bullet3_y,
+	input logic [9:0] bullet4_x,
+	input logic [9:0] bullet4_y,
+	input logic [9:0] bullet5_x,
+	input logic [9:0] bullet5_y,
+	input logic [9:0] bullet6_x,
+	input logic [9:0] bullet6_y,
+	input logic [9:0] bullet7_x,
+	input logic [9:0] bullet7_y,
+	input logic [9:0] bullet8_x,
+	input logic [9:0] bullet8_y,
+	input logic [9:0] bullet9_x,
+	input logic [9:0] bullet9_y,
+	input logic [9:0] bullet10_x,
+	input logic [9:0] bullet10_y,
+	input logic [9:0] DrawX, DrawY,
+	output logic is_bullet1, is_bullet2, is_bullet3, is_bullet4, is_bullet5, is_bullet6,
+			 is_bullet7, is_bullet8,is_bullet9, is_bullet10,
+	output logic [3:0] bullet1_data, bullet2_data, bullet3_data, bullet4_data, bullet5_data, bullet6_data, 
+	       bullet7_data, bullet8_data, bullet9_data, bullet10_data
+);
+	
+	range_checker_bullet checker_inst1 (
+	   .Clk,
+		.bullet_status(bullet_status[0]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet1_x), 
+		.Pos_y(bullet1_y), 
+		.is_bullet(is_bullet1),
+		.bullet_data(bullet1_data)
+	);
+	range_checker_bullet checker_inst2 (
+	   .Clk,
+		.bullet_status(bullet_status[1]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet2_x), 
+		.Pos_y(bullet2_y), 
+		.is_bullet(is_bullet2),
+		.bullet_data(bullet2_data)
+	);
+	range_checker_bullet checker_inst3 (
+	   .Clk,
+		.bullet_status(bullet_status[2]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet3_x), 
+		.Pos_y(bullet3_y), 
+		.is_bullet(is_bullet3),
+		.bullet_data(bullet3_data)
+	);
+	range_checker_bullet checker_inst4 (
+	   .Clk,
+		.bullet_status(bullet_status[3]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet4_x), 
+		.Pos_y(bullet4_y), 
+		.is_bullet(is_bullet4),
+		.bullet_data(bullet4_data)
+	);
+	range_checker_bullet checker_inst5 (
+	   .Clk,
+		.bullet_status(bullet_status[4]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet5_x), 
+		.Pos_y(bullet5_y), 
+		.is_bullet(is_bullet5),
+		.bullet_data(bullet5_data)
+	);
+	range_checker_bullet checker_inst6 (
+	   .Clk,
+		.bullet_status(bullet_status[5]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet6_x), 
+		.Pos_y(bullet6_y), 
+		.is_bullet(is_bullet6),
+		.bullet_data(bullet6_data)
+	);
+	range_checker_bullet checker_inst7 (
+	   .Clk,
+		.bullet_status(bullet_status[6]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet7_x), 
+		.Pos_y(bullet7_y), 
+		.is_bullet(is_bullet7),
+		.bullet_data(bullet7_data)
+	);
+	range_checker_bullet checker_inst8 (
+	   .Clk,
+		.bullet_status(bullet_status[7]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet8_x), 
+		.Pos_y(bullet8_y), 
+		.is_bullet(is_bullet8),
+		.bullet_data(bullet8_data)
+	);
+	range_checker_bullet checker_inst9 (
+	   .Clk,
+		.bullet_status(bullet_status[8]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet9_x), 
+		.Pos_y(bullet9_y), 
+		.is_bullet(is_bullet9),
+		.bullet_data(bullet9_data)
+	);
+	range_checker_bullet checker_inst10 (
+		.Clk,
+		.bullet_status(bullet_status[9]), 
+		.DrawX(DrawX), 
+		.DrawY(DrawX), 
+		.Pos_x(bullet10_x), 
+		.Pos_y(bullet10_y), 
+		.is_bullet(is_bullet10),
+		.bullet_data(bullet10_data)
+	);
+
+endmodule
+
+module range_checker_bullet(
+	input logic Clk,
+	input logic bullet_status,
+	input logic [9:0] DrawX, DrawY,
+	input logic [9:0] Pos_x, Pos_y,
+	output logic is_bullet,
+	output logic [3:0] bullet_data
+);
+
+logic [3:0] size;
+logic [5:0] read_address;
+logic [9:0] candidate;
+logic [3:0] readdata; 
+
+always_comb begin
+	if (bullet_status) begin
+		if (DrawX >= Pos_x && DrawY >= Pos_y) 
+		begin
+			if ((DrawX - Pos_x <= size) && (DrawY - Pos_y <= size))
+				is_bullet = 1'b1;
+			else
+				is_bullet = 1'b0;
+		end else begin
+			is_bullet = 1'b0;
+		end
+	end else begin
+		is_bullet = 1'b0;
+	end
+end
+
+assign size = 4'd8;
+assign candidate = DrawX - Pos_x + 4'd8*(DrawY - Pos_y);
+assign read_address = (is_bullet) ? candidate[5:0] : 6'd0;
+assign bullet_data = (is_bullet) ? readdata : 4'd0;
+bullet_RAM bullet_RAM_inst (.*, .bullet_data(readdata));
+
+endmodule
+
+module  bullet_RAM
+(
+		input [5:0] read_address,
+		input Clk,
+
+		output logic [3:0] bullet_data
+);
+
+//64 = 8*8
+logic [3:0] mem [0:63];
+initial
+begin
+	 $readmemh("sprites/bullet.txt", mem);
+end
+
+always_ff @ (posedge Clk) begin
+	bullet_data <= mem[read_address];
+end
+
+endmodule
+

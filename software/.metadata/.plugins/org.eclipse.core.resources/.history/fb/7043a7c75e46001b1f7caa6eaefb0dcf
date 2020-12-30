@@ -1,0 +1,121 @@
+#ifndef OBJECTS_H_
+#define OBJECTS_H_
+
+#include "alt_types.h"
+
+//sizes
+#define PLAYER_SPRITE_SIZE_X 30
+#define PLAYER_SPRITE_SIZE_Y 50
+#define BULLET_SIZE_X 8
+#define BULLET_SIZE_Y 8
+//positions and speeds
+#define MAX_BULLET_NUM 10
+#define MAX_PLAYER_NUM 2
+#define MAX_HP 5
+#define BULLET_SPEED 15
+#define PLAYER_SPEED 5
+#define PLAYER_JUMP_INITIAL_VY -20
+#define PLAYER1_START_POS_X 100
+#define PLAYER1_START_POS_Y 345
+#define PLAYER2_START_POS_X 540
+#define PLAYER2_START_POS_Y 345
+#define HP1_START_POS_X 30
+#define HP1_START_POS_Y 430
+#define HP2_START_POS_X 350
+#define HP2_START_POS_Y 430
+#define HP_BAR_INTERVAL 7
+//animation
+#define ANIMATION_SPEED 2
+#define PLAYER_HURT_ANIMATION_REFRESH 4
+#define PLAYER_HURT_ANIMATION_INTERVAL 40
+//face direction
+#define FACE_LEFT 0
+#define FACE_RIGHT 1
+//player body size
+#define PLAYER_CENTER_OFFSET_X 18
+#define PLAYER_CENTER_OFFSET_Y 33
+#define PLAYER_GUN_OFFSET 8
+#define PLAYER_HALF_WIDTH 8
+#define PLAYER_HALF_HEIGHT 17
+//acceleration
+#define GRAVITY_EFFECT 2
+//shoot speed
+#define SHOOT_FREQ_LIMIT 10
+
+typedef enum{BACKGROUND, PLAYER, BULLET}object_types_t;
+typedef enum{STAND, STAND_UP, RUN, RUN_UP, JUMP, JUMP_UP} player_status_t;
+typedef enum{START_MENU_BG, GAMING_BG, GAME_OVER_BG} background_type_t;
+typedef enum{UNDEF, PLAYER1_BULLET, PLAYER2_BULLET} bullet_owner_t;
+
+extern alt_32 image_seq_run[3];
+extern alt_32 image_seq_shootup[3];
+extern alt_32 image_seq_frame_stand[1];
+extern alt_32 image_seq_frame_shootup[1];
+
+typedef struct{
+	alt_32 id;//id=-1 means not using
+	alt_32 screen_pos_x;
+	alt_32 screen_pos_y;
+	alt_32 vx;
+	alt_32 vy;
+	alt_32 ax;
+	alt_32 ay;
+	alt_32 size_x;
+	alt_32 size_y;
+	alt_32 current_image;	//there might be series of images for one thing
+	object_types_t obj_type;
+}object_base_t;
+
+typedef struct{
+	object_base_t base;
+	alt_32 HP;
+	alt_32 faceDir;//right: 1, left: -1
+	player_status_t status;
+	alt_32 * current_seq;
+	alt_32 current_seq_len;
+	alt_32 delay_counter;
+	alt_32 frame_counter;
+	alt_32 hurt_mode;
+	alt_32 hurt_counter;
+}player_t;
+
+typedef struct{
+	object_base_t base;
+	alt_32 damage;
+	alt_32 owner;
+}bullet_t;
+
+extern background_type_t current_background;
+extern player_t player1;
+extern player_t player2;
+extern bullet_t bullets[MAX_BULLET_NUM];
+extern alt_32 player1_shoot_delay;
+extern alt_32 player2_shoot_delay;
+extern alt_32 player1_hurt_mode;
+extern alt_32 player1_hurt_animation_refresh;
+extern alt_32 alt_32_player2_hurt_mode;
+extern alt_32 player2_hurt_animation_refresh;
+
+//basic
+void object_init(object_base_t * obj_ptr);
+void next_background();
+void change_background(background_type_t bg);
+void bg_init();
+void players_init();
+void bullets_init();
+void activate_players();
+void deactivate_players();
+//player_status_xxx: change animation, change player_status
+void player_status(player_t * player_ptr, player_status_t status);
+//animation
+void change_animation(player_t * player_ptr, player_status_t player_status);
+alt_32 update_animation(player_t * player_ptr, alt_32 player_id);
+//game operations
+void add_bullet(alt_32 x, alt_32 y, alt_32 vx, alt_32 vy, bullet_owner_t owner);
+void reduce_bullet(alt_32 index);
+void update_players_speed();
+void move_players();
+void move_bullets();
+void cause_damage(player_t * player_ptr);
+
+#endif

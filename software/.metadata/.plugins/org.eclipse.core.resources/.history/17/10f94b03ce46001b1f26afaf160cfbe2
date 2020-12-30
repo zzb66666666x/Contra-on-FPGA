@@ -1,0 +1,40 @@
+#ifndef GAME_LOGIC_H_
+#define GAME_LOGIC_H_
+
+#include"USBDriver/main_usb_interface.h"
+#include "alt_types.h"
+#include "objects.h"
+
+typedef enum {UNKNOWN, PLAYER1, PLAYER2} game_winner_t;
+typedef enum {GAME_PREPARE, START_MENU, IN_GAME, GAME_OVER} game_state_t;
+
+extern volatile alt_32* FRAME_SYNC_PIO;
+extern volatile alt_32* GAME_FILE;
+extern alt_32 should_wait;
+
+void game_init(game_state_t* game_state_ptr);
+void game_start(game_state_t* game_state_ptr);
+void game_loop(game_state_t* game_state_ptr);
+void game_over(game_state_t* game_state_ptr);
+void game_state_transition(game_state_t* game_state_ptr, alt_32 key);
+void update_gamefile(game_state_t * game_state);
+void key_events(game_state_t* game_state_ptr);
+void stop_run(player_t * player_ptr);
+void press_w_up(player_t * player_ptr);
+void press_s_down(player_t * player_ptr);
+void press_d_right(player_t * player_ptr);
+void press_a_left(player_t * player_ptr);
+void press_shoot_horizontal(player_t * player_ptr, alt_32 player_id);
+void press_shoot_vertical(player_t * player_ptr, alt_32 player_id);
+void no_shoot_vertical(player_t * player_ptr, alt_32 player_id);
+void print_result();
+alt_32 frame_clk();
+alt_32 get_player_status();
+alt_32 get_bullet_status();
+alt_32 get_HP_status(player_t * player);
+alt_32 check_game_end();
+
+
+//test functions
+
+#endif

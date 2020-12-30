@@ -1,0 +1,493 @@
+#include "game_logic.h"
+#include "system.h"
+#include <assert.h>
+#include <stdio.h>
+#include "USBDriver/main_usb_interface.h"
+#include "keyboard.h"
+#include <stdio.h>
+#include "boundary.h"
+
+volatile alt_32* FRAME_SYNC_PIO = (alt_32 *)FRAME_SYNC_BASE;
+volatile alt_32* GAME_FILE = (alt_32 *)AVALON_GAME_INTERFACE_BASE;
+game_winner_t winner = UNKNOWN;
+
+//main logic for game
+void game_init(game_state_t* game_state_ptr){
+	bg_init();
+	players_init();
+	bullets_init();
+	boundary_init();
+	*game_state_ptr = START_MENU;
+}
+
+void game_start(game_state_t* game_state_ptr){
+	change_background(START_MENU_BG);
+	key_events(game_state_ptr);
+}
+
+void game_loop(game_state_t* game_state_ptr){
+	change_background(GAMING_BG);
+	//shoot cool down
+	player1_shoot_delay = (player1_shoot_delay == 0)? 0 : player1_shoot_delay-1;
+	player2_shoot_delay = (player2_shoot_delay == 0)? 0 : player2_shoot_delay-1;
+	//read keyboard
+	key_events(game_state_ptr);
+	//move objects
+	move_players();
+	move_bullets();
+	//update animation
+	player1.base.current_image=update_animation(&player1, 0);
+	player2.base.current_image=update_animation(&player2, 1);
+	//printf("player2 current status: %d\n", player2.status);
+	if (check_game_end()){
+		*game_state_ptr = GAME_OVER;
+		print_result();
+		//wait a moment
+		for (int i=0; i<100000; i++){}
+	}
+}
+
+void game_over(game_state_t* game_state_ptr){
+	change_background(GAME_OVER_BG);
+	deactivate_players();
+	key_events(game_state_ptr);
+}
+
+void key_events(game_state_t* game_state_ptr){
+	alt_u8 cur_key;
+	alt_8 player1_run = 0;
+	alt_8 player2_run = 0;
+	alt_8 player1_shoot_up = 0;
+	alt_8 player2_shoot_up = 0;
+	if (keycodes_info.key_pressed){
+		for (int i=0; i<MAX_KEY_USED; i++){
+			cur_key = keycodes_info.keys[i];
+			switch (cur_key){
+			case KEY_W:
+				if (*game_state_ptr == IN_GAME){
+					press_w_up(&player1);
+				}
+				break;
+			case KEY_UP:
+				if (*game_state_ptr == IN_GAME){
+					press_w_up(&player2);
+				}
+				break;
+			case KEY_A:
+				if (*game_state_ptr == IN_GAME){
+					press_a_left(&player1);
+					player1_run = 1;
+				}
+				break;
+			case KEY_LEFT:
+				if (*game_state_ptr == IN_GAME){
+					press_a_left(&player2);
+					player2_run = 1;
+				}
+				break;
+			case KEY_S:
+				if (*game_state_ptr == IN_GAME){
+					press_s_down(&player1);
+				}
+				break;
+			case KEY_DOWN:
+				if (*game_state_ptr == IN_GAME){
+					press_s_down(&player2);
+				}
+				break;
+			case KEY_D:
+				if (*game_state_ptr == IN_GAME){
+					press_d_right(&player1);
+					player1_run = 1;
+				}
+				break;
+			case KEY_RIGHT:
+				if (*game_state_ptr == IN_GAME){
+					press_d_right(&player2);
+					player2_run = 1;
+				}
+				break;
+			case KEY_J:
+				if (*game_state_ptr == IN_GAME){
+					press_shoot_horizontal(&player1, 0);
+				}
+				break;
+			case KEY_K:
+				if (*game_state_ptr == IN_GAME){
+					press_shoot_vertical(&player1, 0);
+					player1_shoot_up = 1;
+				}
+				break;
+			case KEY_ENTER:
+				game_state_transition(game_state_ptr, KEY_ENTER);
+				break;
+			case KEY_KP1:
+				if (*game_state_ptr == IN_GAME){
+					press_shoot_horizontal(&player2, 1);
+				}
+				break;
+			case KEY_KP2:
+				if (*game_state_ptr == IN_GAME){
+					press_shoot_vertical(&player2, 1);
+					player2_shoot_up = 1;
+				}
+				break;
+			case KEY_ESC:
+				game_state_transition(game_state_ptr, KEY_ESC);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	if (player1_run == 0 && player1.status == RUN){
+		stop_run(&player1);
+	}
+	if (player2_run == 0 && player2.status == RUN){
+		stop_run(&player2);
+	}
+	if (player1_shoot_up == 0){
+		no_shoot_vertical(&player1, 0);
+	}
+	if (player2_shoot_up == 0){
+		no_shoot_vertical(&player2, 1);
+	}
+}
+
+void stop_run(player_t * player_ptr){
+	player_status(player_ptr, STAND);
+	player_ptr->base.vx = 0;
+	player_ptr->base.vy = 0;
+}
+
+void press_w_up(player_t * player_ptr){
+	//TODO: finish the logic
+	switch(player_ptr->status){
+	case STAND:
+		player_status(player_ptr, JUMP);
+		player_ptr->base.vy = PLAYER_JUMP_INITIAL_VY; //-10 goes up to the screen
+		break;
+	case STAND_UP:
+		player_status(player_ptr, JUMP_UP);
+		player_ptr->base.vy = PLAYER_JUMP_INITIAL_VY;
+		break;
+	case RUN:
+		player_status(player_ptr, JUMP);
+		player_ptr->base.vy = PLAYER_JUMP_INITIAL_VY;
+		break;
+	case RUN_UP:
+		player_status(player_ptr, JUMP_UP);
+		player_ptr->base.vy = PLAYER_JUMP_INITIAL_VY;
+		break;
+	case JUMP:
+		player_status(player_ptr, JUMP);
+		break;
+	case JUMP_UP:
+		player_status(player_ptr, JUMP_UP);
+		break;
+	default :
+		break;
+	}
+	player_ptr->base.ay = GRAVITY_EFFECT;
+}
+
+void press_a_left(player_t * player_ptr){
+	//TODO: finish the logic
+	switch (player_ptr->status){
+	case STAND:
+		player_status(player_ptr, RUN);
+		break;
+	case JUMP:
+		player_status(player_ptr, JUMP);
+		break;
+	case JUMP_UP:
+		player_status(player_ptr, JUMP_UP);
+		break;
+	case STAND_UP:
+		player_status(player_ptr, STAND_UP);
+		break;
+	default :
+		break;
+	}
+	player_ptr->faceDir = FACE_LEFT;
+	player_ptr->base.vx = -1*PLAYER_SPEED;
+}
+
+void press_s_down(player_t * player_ptr){
+	//TODO: finish the logic
+	player_status_t next_status;
+	alt_32 next_y;
+	switch(player_ptr->status){
+	case STAND:
+		next_status = JUMP;
+		next_y =  player_ptr->base.screen_pos_y + PLAYER_MOVE_DOWN;
+		break;
+	case STAND_UP:
+		next_status = JUMP_UP;
+		next_y = player_ptr->base.screen_pos_y + PLAYER_MOVE_DOWN;
+		break;
+	case RUN:
+		next_status = JUMP;
+		next_y = player_ptr->base.screen_pos_y + PLAYER_MOVE_DOWN;
+		break;
+	case RUN_UP:
+		next_status = JUMP_UP;
+		next_y = player_ptr->base.screen_pos_y + PLAYER_MOVE_DOWN;
+		break;
+	default:
+		next_status = player_ptr->status;
+		next_y = player_ptr->base.screen_pos_y;
+		break;
+	}
+	//printf("%d\n", player_ptr->platform);
+	if (player_ptr->platform == 0){
+		//printf("already bottom\n");
+		return;
+	}
+	//printf("checking\n");
+	player_status(player_ptr, next_status);
+	player_ptr->base.ay = GRAVITY_EFFECT;
+	player_ptr->base.screen_pos_y = next_y;
+}
+
+void press_d_right(player_t * player_ptr){
+	//TODO: finish the logic
+	switch (player_ptr->status){
+	case STAND:
+		player_status(player_ptr, RUN);
+		break;
+	case JUMP:
+		player_status(player_ptr, JUMP);
+		break;
+	case JUMP_UP:
+		player_status(player_ptr, JUMP_UP);
+		break;
+	case STAND_UP:
+		player_status(player_ptr, STAND_UP);
+		break;
+	default :
+		break;
+	}
+	player_ptr->faceDir = FACE_RIGHT;
+	player_ptr->base.vx = PLAYER_SPEED;
+}
+
+void press_shoot_horizontal(player_t * player_ptr, alt_32 player_id){
+	//alt_32 center_x = player_ptr->base.screen_pos_x + PLAYER_CENTER_OFFSET_X;
+	alt_32 center_y = player_ptr->base.screen_pos_y + PLAYER_CENTER_OFFSET_Y;
+	alt_32 x, y, vx, vy;
+	bullet_owner_t owner;
+	if (player_ptr->faceDir == FACE_LEFT){
+		x = player_ptr->base.screen_pos_x;
+		y = center_y - PLAYER_GUN_OFFSET;
+		vx = -1*BULLET_SPEED;
+		vy = 0;
+	}
+	else if (player_ptr->faceDir == FACE_RIGHT){
+		x = player_ptr->base.screen_pos_x + player_ptr->base.size_x;
+		y = center_y - PLAYER_GUN_OFFSET;
+		vx = BULLET_SPEED;
+		vy = 0;
+	}
+	if (player_id == 0)
+		owner = PLAYER1_BULLET;
+	else if (player_id == 1)
+		owner = PLAYER2_BULLET;
+	add_bullet(x, y, vx, vy, owner);
+}
+
+void press_shoot_vertical(player_t * player_ptr, alt_32 player_id){
+	//TODO: shoot bullet vertically
+	//change status, thus new animation
+	switch(player_ptr->status){
+	case STAND:
+		player_status(player_ptr, STAND_UP);
+		break;
+	case JUMP:
+		player_status(player_ptr, JUMP_UP);
+		break;
+	case RUN:
+		player_status(player_ptr, RUN_UP);
+		break;
+	default:
+		//ALREADY SHOOT UP
+		break;
+	}
+	//shoot one bullet
+	alt_32 x, y, vx, vy;
+	x = player_ptr->base.screen_pos_x + PLAYER_GUN_OFFSET;
+	y = player_ptr->base.screen_pos_y;
+	vx = 0;
+	vy = -1*BULLET_SPEED;
+	bullet_owner_t owner;
+	if (player_id == 0){
+		owner = PLAYER1_BULLET;
+	}
+	if (player_id == 1){
+		owner = PLAYER2_BULLET;
+	}
+	add_bullet(x, y, vx, vy, owner);
+}
+
+void no_shoot_vertical(player_t * player_ptr, alt_32 player_id){
+	switch(player_ptr->status){
+	case STAND_UP:
+		player_status(player_ptr, STAND);
+		break;
+	case JUMP_UP:
+		player_status(player_ptr, JUMP);
+		break;
+	case RUN_UP:
+		player_status(player_ptr, RUN);
+		break;
+	default:
+		//not in UP states
+		break;
+	}
+}
+
+void game_state_transition(game_state_t* game_state_ptr, alt_32 key){
+	if (key == KEY_ENTER){
+		if (*game_state_ptr == START_MENU){
+			*game_state_ptr = IN_GAME;
+			activate_players();
+		}
+		else if (*game_state_ptr == GAME_OVER){
+			*game_state_ptr = GAME_PREPARE;
+		}
+	}
+	else if (key == KEY_ESC){
+		if (*game_state_ptr == START_MENU){
+			*game_state_ptr = GAME_OVER;
+		}
+		else if (*game_state_ptr == IN_GAME){
+			*game_state_ptr = GAME_OVER;
+		}
+	}
+}
+
+alt_32 check_game_end(){
+	if (player1.HP == 0 && player2.HP>0){
+		winner = PLAYER2;
+		return 1;
+	}
+	else if (player2.HP == 0 && player1.HP>=0){
+		winner = PLAYER1;
+		return 1;
+	}
+	return 0;
+}
+
+alt_32 frame_clk(){
+	return *FRAME_SYNC_PIO;
+}
+
+void print_result(){
+	switch(winner){
+	case UNKNOWN:
+		printf("\n######DON'T KNOW THE WINNER!######\n");
+		break;
+	case PLAYER1:
+		printf("\n######THE WINNER IS PLAYER 1!######\n");
+		break;
+	case PLAYER2:
+		printf("\n######THE WINNER IS PLAYER 2!######\n");
+		break;
+	}
+}
+
+//game file operations
+alt_32 get_player_status(){
+	alt_32 ans = 0;
+	if (player1.base.id>=0){
+		ans += 1;
+	}
+	if (player2.base.id>=0){
+		ans +=2;
+	}
+	return ans;
+}
+
+alt_32 get_bullet_status(){
+	alt_32 m = 0;
+	for (int i=0; i<MAX_BULLET_NUM; i++){
+		//printf("%d  ", bullets[i].base.id);
+		if (bullets[i].base.id >= 0){
+			m = m + (1 << i);
+		}
+	}
+	//printf("\n");
+	return m;
+}
+
+alt_32 get_HP_status(player_t * player){
+	if (player->HP == 0){
+		return 0;
+	}
+	else if (player->HP == 1){
+		return 16;
+	}
+	else if (player->HP == 2){
+		return 24;
+	}
+	else if (player->HP == 3){
+		return 28;
+	}
+	else if (player->HP == 4){
+		return 30;
+	}
+	else
+		return 31;//binary 11111
+}
+void update_gamefile(game_state_t * game_state){
+	//background
+	GAME_FILE[0] = (alt_32)current_background;
+	//player1
+	GAME_FILE[1] = player1.base.screen_pos_x;
+	GAME_FILE[2] = player1.base.screen_pos_y;
+	GAME_FILE[3] = player1.base.current_image;
+	GAME_FILE[4] = player1.faceDir;
+	//game result
+	GAME_FILE[5] = get_player_status();
+	//player2
+	GAME_FILE[6] = player2.base.screen_pos_x;
+	GAME_FILE[7] = player2.base.screen_pos_y;
+	GAME_FILE[8] = player2.base.current_image;
+	GAME_FILE[9] = player2.faceDir;
+	//bullets
+	GAME_FILE[10] = get_bullet_status(bullets);
+	//printf("%x\n",get_bullet_status(bullets));
+	GAME_FILE[11] = bullets[0].base.screen_pos_x;
+	GAME_FILE[12] = bullets[0].base.screen_pos_y;
+	GAME_FILE[13] = bullets[1].base.screen_pos_x;
+	GAME_FILE[14] = bullets[1].base.screen_pos_y;
+	GAME_FILE[15] = bullets[2].base.screen_pos_x;
+	GAME_FILE[16] = bullets[2].base.screen_pos_y;
+	GAME_FILE[17] = bullets[3].base.screen_pos_x;
+	GAME_FILE[18] = bullets[3].base.screen_pos_y;
+	GAME_FILE[19] = bullets[4].base.screen_pos_x;
+	GAME_FILE[20] = bullets[4].base.screen_pos_y;
+	GAME_FILE[21] = bullets[5].base.screen_pos_x;
+	GAME_FILE[22] = bullets[5].base.screen_pos_y;
+	GAME_FILE[23] = bullets[6].base.screen_pos_x;
+	GAME_FILE[24] = bullets[6].base.screen_pos_y;
+	GAME_FILE[25] = bullets[7].base.screen_pos_x;
+	GAME_FILE[26] = bullets[7].base.screen_pos_y;
+	GAME_FILE[27] = bullets[8].base.screen_pos_x;
+	GAME_FILE[28] = bullets[8].base.screen_pos_y;
+	GAME_FILE[29] = bullets[9].base.screen_pos_x;
+	GAME_FILE[30] = bullets[9].base.screen_pos_y;
+	//HP
+	GAME_FILE[31] = get_HP_status(&player1);
+	GAME_FILE[32] = get_HP_status(&player2);
+	//printf("%x   ", get_HP_status(&player1));
+	//printf("%x\n", get_HP_status(&player2));
+	GAME_FILE[33] = HP1_START_POS_X;
+	GAME_FILE[34] = HP1_START_POS_Y;
+	GAME_FILE[35] = HP2_START_POS_X;
+	GAME_FILE[36] = HP2_START_POS_Y;
+	GAME_FILE[37] = HP_BAR_INTERVAL;
+}
+
+
+

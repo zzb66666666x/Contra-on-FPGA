@@ -1,0 +1,108 @@
+/*
+ * ECE385-HelperTools/PNG-To-Txt
+ * Author: Rishi Thakkar
+ *
+ */
+module background (
+	input Clk, 
+	input logic [3:0] current_bg,
+	input logic [9:0] DrawX, DrawY,
+	output logic [3:0] background_data,
+	output is_background
+);
+	// screen size
+	parameter [9:0] SCREEN_WIDTH =  10'd480;
+   parameter [9:0] SCREEN_LENGTH = 10'd640;
+	parameter [9:0] RESHAPE_LENGTH = 10'd320;
+	//--------------------load memory-----------------//
+	logic [18:0] read_address;
+	assign read_address = {9'd0,DrawX/2} + {9'd0, DrawY/2}*{9'd0, RESHAPE_LENGTH};
+	logic [3:0] start_menu_data, in_game_data, game_over_data;
+	
+	always_comb begin
+		is_background = 1'b1;
+		case(current_bg) 
+		4'd0: background_data = start_menu_data;
+		4'd1: background_data = in_game_data;
+		4'd2: background_data = game_over_data;
+		default: background_data = 4'hf;
+		endcase
+	end
+	
+	start_menu_RAM bg_ram1(.*);
+	in_game_RAM bg_ram2(.*);
+	game_over_RAM bg_ram3(.*);
+
+endmodule
+
+module  start_menu_RAM
+(
+		input [18:0] read_address,
+		input Clk,
+
+		output logic [3:0] start_menu_data
+);
+
+// mem has width of 4 bits and a total of 307200 addresses
+//logic [3:0] mem [0:307199];
+//76800 = 320*240
+logic [3:0] mem [0:76799];
+initial
+begin
+	 $readmemh("sprites/startmenu.txt", mem);
+end
+
+
+always_ff @ (posedge Clk) begin
+	start_menu_data <= mem[read_address];
+end
+
+endmodule
+
+module  in_game_RAM
+(
+		input [18:0] read_address,
+		input Clk,
+
+		output logic [3:0] in_game_data
+);
+
+// mem has width of 4 bits and a total of 307200 addresses
+//logic [3:0] mem [0:307199];
+//76800 = 320*240
+logic [3:0] mem [0:76799];
+initial
+begin
+	 $readmemh("sprites/ingame.txt", mem);
+end
+
+
+always_ff @ (posedge Clk) begin
+	in_game_data <= mem[read_address];
+end
+
+endmodule
+
+module  game_over_RAM
+(
+		input [18:0] read_address,
+		input Clk,
+
+		output logic [3:0] game_over_data
+);
+
+// mem has width of 4 bits and a total of 307200 addresses
+//logic [3:0] mem [0:307199];
+//76800 = 320*240
+logic [3:0] mem [0:76799];
+initial
+begin
+	 $readmemh("sprites/gameover.txt", mem);
+end
+
+
+always_ff @ (posedge Clk) begin
+	game_over_data <= mem[read_address];
+end
+
+endmodule

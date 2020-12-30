@@ -1,0 +1,258 @@
+#include "objects.h"
+#include <stdio.h>
+#include <assert.h>
+#include "boundary.h"
+
+//objects
+background_type_t current_background;
+player_t player1;
+player_t player2;
+bullet_t bullets[MAX_BULLET_NUM];
+alt_u32 bullets_num = 0;
+//animation
+alt_32 image_seq_run[3] = {0,1,2};
+alt_32 image_seq_shootup[3] = {3,4,5};
+alt_32 image_seq_frame_stand[1] = {0};
+alt_32 image_seq_frame_shootup[1] = {3};
+//shoot_delay
+alt_32 player1_shoot_delay = 0;
+alt_32 player2_shoot_delay = 0;
+
+void object_init(object_base_t * obj_ptr){
+	obj_ptr->id = -1;//-1 means not using
+	obj_ptr->screen_pos_x = 0;
+	obj_ptr->screen_pos_y = 0;
+	obj_ptr->vx = 0;
+	obj_ptr->vy = 0;
+	obj_ptr->ax = 0;
+	obj_ptr->ay = 0;
+	obj_ptr->size_x = 0;
+	obj_ptr->size_y = 0;
+	obj_ptr->current_image = 0;
+	obj_ptr->obj_type = BACKGROUND;
+}
+
+void bg_init(){
+	current_background = START_MENU_BG;
+}
+
+void change_background(background_type_t bg){
+	current_background = bg;
+}
+
+void players_init(){
+	player_t* player1_ptr = &player1;
+	player_t* player2_ptr = &player2;
+	object_init((object_base_t *)player1_ptr);
+	object_init((object_base_t *)player2_ptr);
+	player1.HP = 0;
+	player1.status = STAND;
+	player1.base.obj_type = PLAYER;
+	player1.base.size_x = PLAYER_SPRITE_SIZE_X;
+	player1.base.size_y = PLAYER_SPRITE_SIZE_Y;
+	player1.faceDir = FACE_RIGHT;
+	player1.base.screen_pos_x = PLAYER1_START_POS_X;
+	player1.base.screen_pos_y = PLAYER1_START_POS_Y;
+	player1.base.current_image = 0;
+	player1.current_seq = image_seq_frame_stand;
+	player1.current_seq_len = 1;
+	player1.frame_counter = -1;
+	player1.delay_counter = -1;
+	player1.hurt_mode = 0;
+	player1.hurt_counter = 0;
+	player1.platform = 0;
+	//player2
+	player2.HP = 0;
+	player2.status = STAND;
+	player2.base.obj_type = PLAYER;
+	player2.base.size_x = PLAYER_SPRITE_SIZE_X;
+	player2.base.size_y = PLAYER_SPRITE_SIZE_Y;
+	player2.faceDir = FACE_LEFT;
+	player2.base.screen_pos_x = PLAYER2_START_POS_X;
+	player2.base.screen_pos_y = PLAYER2_START_POS_Y;
+	player2.base.current_image = 0;
+	player2.current_seq = image_seq_frame_stand;
+	player2.current_seq_len = 1;
+	player2.frame_counter = -1;
+	player2.delay_counter = -1;
+	player2.hurt_mode = 0;
+	player2.hurt_counter = 0;
+	player2.platform = 0;
+}
+
+void activate_players(){
+	player1.HP = MAX_HP;
+	player2.HP = MAX_HP;
+	player1.base.id = 0;
+	player2.base.id = 1;
+}
+
+void deactivate_players(){
+	player1.HP = 0;
+	player2.HP = 0;
+	player1.base.id = -1;
+	player2.base.id = -1;
+}
+
+void player_status(player_t * player_ptr, player_status_t status){
+	player_ptr->status = status;
+	change_animation(player_ptr, status);
+}
+
+void bullets_init(){
+	for (int i=0; i<MAX_BULLET_NUM; i++){
+		object_init((object_base_t *)(bullets+i));
+		bullets[i].base.size_x = BULLET_SIZE_X;
+		bullets[i].base.size_y = BULLET_SIZE_Y;
+		bullets[i].base.obj_type = BULLET;
+		bullets[i].damage = 1;
+		bullets[i].owner = UNDEF;
+		//printf("%d  ", bullets[i].base.id);
+	}
+}
+
+void change_animation(player_t * player_ptr, player_status_t player_status){
+	player_ptr->delay_counter = -1;
+	player_ptr->frame_counter = -1;
+	switch (player_status){
+	case STAND:
+		player_ptr->current_seq = image_seq_frame_stand;
+		player_ptr->current_seq_len = 1;
+		break;
+	case JUMP:
+		player_ptr->current_seq = image_seq_frame_stand;
+		player_ptr->current_seq_len = 1;
+		break;
+	case RUN:
+		player_ptr->current_seq = image_seq_run;
+		player_ptr->current_seq_len = 3;
+		break;
+	case RUN_UP:
+		player_ptr->current_seq = image_seq_shootup;
+		player_ptr->current_seq_len = 3;
+		break;
+	case STAND_UP:
+		player_ptr->current_seq = image_seq_frame_shootup;
+		player_ptr->current_seq_len = 1;
+		break;
+	case JUMP_UP:
+		player_ptr->current_seq = image_seq_frame_shootup;
+		player_ptr->current_seq_len = 1;
+		break;
+	}
+}
+
+alt_32 update_animation(player_t * player_ptr, alt_32 player_id){
+	player_ptr->delay_counter = (player_ptr->delay_counter + 1)%ANIMATION_SPEED;
+	if (player_ptr->delay_counter == 0)
+		player_ptr->frame_counter = (player_ptr->frame_counter+1)%(player_ptr->current_seq_len);
+	assert(player_ptr->frame_counter >= 0);
+	if (player_ptr->hurt_mode > 0){
+		player_ptr->hurt_counter = (player_ptr->hurt_counter+1)%(PLAYER_HURT_ANIMATION_REFRESH);
+		if (player_ptr->hurt_counter == 0){
+			//make player id less than 0
+			player_ptr->base.id = (player_ptr->base.id == -1) ? player_id : -1;
+			player_ptr->hurt_mode -= PLAYER_HURT_ANIMATION_REFRESH;
+		}
+	}
+	else {
+		//end of one hurt animation, reset the hurt animation
+		if (player_ptr->base.id != player_id){
+			player_ptr->base.id = player_id;
+		}
+		player_ptr->hurt_mode = 0;
+		player_ptr->hurt_counter = 0;
+	}
+	return player_ptr->current_seq[player_ptr->frame_counter];
+}
+
+void add_bullet(alt_32 x, alt_32 y, alt_32 vx, alt_32 vy, bullet_owner_t owner){
+	//printf("function call\n");
+	if (bullets_num>=MAX_BULLET_NUM)
+		//printf("max bullet !!!\n");
+		return;
+	//check shoot delay
+	if (owner == PLAYER1_BULLET){
+		if (player1_shoot_delay != 0){
+			return;
+		}
+		else {
+			player1_shoot_delay = SHOOT_FREQ_LIMIT;
+		}
+	}
+	else if (owner == PLAYER2_BULLET){
+		if (player2_shoot_delay != 0){
+			return;
+		}
+		else{
+			player2_shoot_delay = SHOOT_FREQ_LIMIT;
+		}
+	}
+	//add bullets to free space
+	for (int i = 0;i<MAX_BULLET_NUM; i++){
+		if (bullets[i].base.id == -1){
+			bullets[i].base.id = i;
+			bullets[i].base.screen_pos_x = x;
+			bullets[i].base.screen_pos_y = y;
+			bullets[i].base.vx = vx;
+			bullets[i].base.vy = vy;
+			bullets[i].owner = owner;
+			break;
+		}
+	}
+	bullets_num = bullets_num + 1;
+}
+
+void reduce_bullet(alt_32 index){
+	//reduce the data, mark the id to -1
+	if (bullets[index].base.id == -1)
+		return;
+	bullets[index].base.id = -1;
+	bullets_num = bullets_num - 1;
+	bullets[index].owner = UNDEF;
+	bullets[index].base.vx = 0;
+	bullets[index].base.vy = 0;
+}
+
+void update_players_speed(){
+	//TODO: update speed by acceleration
+	//only in y axis we define the a to be nonzero
+	if (player1.base.ay != 0){
+		player1.base.vy += player1.base.ay;
+	}
+	if (player2.base.ay != 0){
+		player2.base.vy += player2.base.ay;
+	}
+
+}
+
+void move_players(){
+	update_players_speed();
+	player_t * player1_ptr = &player1;
+	player_t * player2_ptr = &player2;
+	player1.base.screen_pos_x = player1.base.screen_pos_x + player1.base.vx;
+	player2.base.screen_pos_x = player2.base.screen_pos_x + player2.base.vx;
+	player1.base.screen_pos_y = player1.base.screen_pos_y + player1.base.vy;
+	player2.base.screen_pos_y = player2.base.screen_pos_y + player2.base.vy;
+	boundary_check_player(player1_ptr);
+	boundary_check_player(player2_ptr);
+}
+
+void move_bullets(){
+	bullet_t * bullet_ptr;
+	for (int i = 0;i<MAX_BULLET_NUM; i++){
+		if (bullets[i].base.id != -1){
+			bullet_ptr = bullets + i;
+			bullets[i].base.screen_pos_x = bullets[i].base.screen_pos_x + bullets[i].base.vx;
+			bullets[i].base.screen_pos_y = bullets[i].base.screen_pos_y + bullets[i].base.vy;
+			boundary_check_bullet(bullet_ptr);
+		}
+	}
+}
+
+void cause_damage(player_t * player_ptr){
+	if (player_ptr->HP > 0){
+		player_ptr->HP --;
+		player_ptr->hurt_mode = PLAYER_HURT_ANIMATION_INTERVAL;
+	}
+}

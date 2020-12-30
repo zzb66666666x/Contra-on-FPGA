@@ -1,0 +1,188 @@
+#include "boundary.h"
+#include <assert.h>
+#include <stdio.h>
+
+platform_t platforms[PLATFORM_NUM];
+
+void boundary_init(){
+	//0
+	platforms[0].lx = LEFT_MOST;
+	platforms[0].rx = RIGHT_MOST;
+	platforms[0].y = PLAYER1_START_POS_Y+PLAYER_SPRITE_SIZE_Y;
+	platforms[0].id = 0;
+	//1
+	platforms[1].lx = 400;
+	platforms[1].rx = 640;
+	platforms[1].y = 332;
+	platforms[1].id = 1;
+	//2
+	platforms[2].lx = 124;
+	platforms[2].rx = 280;
+	platforms[2].y = 332;
+	platforms[2].id = 2;
+	//3
+	platforms[3].lx = 0;
+	platforms[3].rx = 224;
+	platforms[3].y = 273;
+	platforms[3].id = 3;
+	//4
+	platforms[4].lx = 320;
+	platforms[4].rx = 560;
+	platforms[4].y = 273;
+	platforms[4].id = 4;
+	//5
+	platforms[5].lx = 240;
+	platforms[5].rx = 560;
+	platforms[5].y = 208;
+	platforms[5].id = 5;
+	//6
+	platforms[6].lx = 0;
+	platforms[6].rx = 320;
+	platforms[6].y = 142;
+	platforms[6].id = 6;
+	//7
+	platforms[7].lx = 400;
+	platforms[7].rx = 640;
+	platforms[7].y = 142;
+	platforms[7].id = 7;
+	//8
+	platforms[8].lx = 80;
+	platforms[8].rx = 236;
+	platforms[8].y = 76;
+	platforms[8].id = 8;
+	//9
+	platforms[9].lx = 366;
+	platforms[9].rx = 524;
+	platforms[9].y = 76;
+	platforms[9].id = 9;
+}
+
+void boundary_check_player(player_t * player_ptr){
+	//coefficients of player
+	alt_32 center_x = player_ptr->base.screen_pos_x + PLAYER_CENTER_OFFSET_X;
+	alt_32 center_y = player_ptr->base.screen_pos_y + PLAYER_CENTER_OFFSET_Y;
+	alt_32 left_up_x = center_x - PLAYER_HALF_WIDTH;
+	alt_32 right_down_x = center_x + PLAYER_HALF_WIDTH;
+	alt_32 right_down_y = center_y + PLAYER_HALF_HEIGHT;
+	alt_32 player_vy = player_ptr->base.vy;
+	//left right boundaries
+	if (player_ptr->faceDir == FACE_LEFT){
+		if (player_ptr->base.screen_pos_x < LEFT_MOST){
+			//let center_x == PLAYER_HALF_WIDTH
+			//screen_pos_x + PLAYER_CENTER_OFFSET_X = center_x = PLAYER_HALF_WIDTH
+			player_ptr->base.screen_pos_x = LEFT_MOST;
+		}
+	}
+	else if (player_ptr->faceDir == FACE_RIGHT){
+		if (player_ptr->base.screen_pos_x + player_ptr->base.size_x > RIGHT_MOST){
+			//center_x == RIGHT_MOST - PLAYER_HALF_WIDTH
+			//screen_pos_x + PLAYER_CENTER_OFFSET_X = center_x
+			player_ptr->base.screen_pos_x = RIGHT_MOST - player_ptr->base.size_x;
+		}
+	}
+	//screen top boundary
+	if ((player_ptr->base.screen_pos_y < SCREEN_TOP)&&
+		(player_ptr->status == JUMP || player_ptr->status == JUMP_UP)){
+		//bounce the player back
+		player_ptr->base.vy = -1*player_ptr->base.vy;
+		player_ptr->base.screen_pos_y = SCREEN_TOP;
+	}
+	//platforms
+	for (int i=0; i<PLATFORM_NUM; i++){
+		//printf("checking boundaries!!!\n");
+		//check boundaries in x to see if the player will fall down
+		if ((player_ptr->platform == i)&&
+			((player_ptr->faceDir == FACE_LEFT && right_down_x <= platforms[i].lx) ||
+			(player_ptr->faceDir == FACE_RIGHT && left_up_x >= platforms[i].rx)) &&
+			(isclose(right_down_y, platforms[i].y))&&
+			(player_ptr->status != JUMP && player_ptr->status != JUMP_UP)){
+			//exceed the platform, fall down, not triggered by key codes!
+			if (player_ptr->status == STAND || player_ptr->status == RUN){
+				//printf("%d\n",i);
+				player_status(player_ptr, JUMP);
+			}
+			else if (player_ptr->status == STAND_UP || player_ptr->status == RUN_UP){
+				player_status(player_ptr, JUMP_UP);
+			}
+			player_ptr->base.ay = GRAVITY_EFFECT;
+			break;
+		}
+		//WARNING: lower height level means larger y !!!!!!!!!
+		//TODO: logic checking the y axis with platform
+		if ((left_up_x <= platforms[i].rx && right_down_x >= platforms[i].lx) &&
+			(right_down_y >= platforms[i].y && right_down_y <= platforms[i].y + player_vy)&&
+			(player_ptr->status == JUMP || player_ptr->status == JUMP_UP)){
+			//time to land
+			//printf("land on platform !!!\n");
+			//only land when player is jumping down the platform, but player can jump "up" across it
+			player_ptr->platform = i;
+			player_ptr->base.screen_pos_y = platforms[i].y - player_ptr->base.size_y;
+			player_ptr->base.vx = 0;
+			player_ptr->base.vy = 0;
+			player_ptr->base.ay = 0;
+			if (player_ptr->status == JUMP)
+				player_status(player_ptr, STAND);
+			else
+				player_status(player_ptr, STAND_UP);
+			break;
+		}
+	}
+}
+
+void boundary_check_bullet(bullet_t * bullet_ptr){
+	if ((bullet_ptr->base.screen_pos_x < LEFT_MOST)||
+		(bullet_ptr->base.screen_pos_x > RIGHT_MOST)||
+		(bullet_ptr->base.screen_pos_y < SCREEN_TOP)||
+		(bullet_ptr->base.screen_pos_y > SCREEN_BOTTOM))
+		reduce_bullet(bullet_ptr->base.id);
+	check_hurt(&player1, bullet_ptr, 0);
+	check_hurt(&player2, bullet_ptr, 1);
+}
+
+void check_hurt(player_t * player_ptr, bullet_t * bullet_ptr, alt_32 id){
+	if (bullet_ptr->base.id < 0)
+		return;
+	//if hit player and the bullet is from another player, then call cause_damage()
+	if ((bullet_ptr->owner == PLAYER1_BULLET && id == 0)||
+		(bullet_ptr->owner == PLAYER2_BULLET && id == 1)||
+		 player_ptr->hurt_mode>0){
+		//if the player is in hurt mode, it will not be hurt again
+		return;
+	}
+	//get the bounding box of the player body
+	alt_32 player_center_x = player_ptr->base.screen_pos_x + PLAYER_CENTER_OFFSET_X;
+	alt_32 player_center_y = player_ptr->base.screen_pos_y + PLAYER_CENTER_OFFSET_Y;
+	bounding_box_t player_box = {player_center_x - PLAYER_HALF_WIDTH,
+								player_center_y - PLAYER_HALF_HEIGHT,
+								player_center_x + PLAYER_HALF_WIDTH,
+								player_center_y + PLAYER_HALF_HEIGHT};
+	//boundary of the bullet
+	alt_32 bullet_left_up_x = bullet_ptr->base.screen_pos_x;
+	alt_32 bullet_left_up_y = bullet_ptr->base.screen_pos_y;
+	alt_32 bullet_right_down_x = bullet_left_up_x + BULLET_SIZE_X;
+	alt_32 bullet_right_down_y = bullet_left_up_y + BULLET_SIZE_Y;
+	if ((inbox(bullet_left_up_x,bullet_left_up_y,&player_box))||
+		(inbox(bullet_right_down_x,bullet_right_down_y,&player_box))||
+		(inbox(bullet_left_up_x,bullet_right_down_y,&player_box))||
+		(inbox(bullet_right_down_x,bullet_left_up_y,&player_box))){
+		cause_damage(player_ptr);
+		reduce_bullet(bullet_ptr->base.id);
+	}
+}
+
+alt_32 isclose(alt_32 a, alt_32 b){
+	//maybe the pixels calculation is not accurate enough and some data don't match perfectly
+	alt_32 abs_diff = (a-b<0)? b-a : a-b;
+	if (abs_diff <= 1){return 1;}
+	return 0;
+}
+
+alt_32 inbox(alt_32 x, alt_32 y, bounding_box_t * box){
+	if ((x >= box->left_up_x)&&
+		(x <= box->right_down_x)&&
+		(y >= box->left_up_y)&&
+		(y <= box->right_down_y)){
+		return 1;
+	}
+	return 0;
+}
