@@ -3300,3 +3300,15 @@ Info: Building ../game_bsp/
 D:/Quartus/intelFPGA_lite/18.0/nios2eds/bin/gnu/H-x86_64-mingw32/bin/make --no-print-directory -C ../game_bsp/
 [BSP build complete]
 [game build complete]
+09:58:26 **** Incremental Build of configuration Nios II for project game ****
+make all 
+Info: Building ../game_bsp/
+D:/Quartus/intelFPGA_lite/18.0/nios2eds/bin/gnu/H-x86_64-mingw32/bin/make --no-print-directory -C ../game_bsp/
+[BSP build complete]
+[game build complete]
+10:51:05 **** Incremental Build of configuration Nios II for project game ****
+make all 
+Info: Building ../game_bsp/
+D:/Quartus/intelFPGA_lite/18.0/nios2eds/bin/gnu/H-x86_64-mingw32/bin/make --no-print-directory -C ../game_bsp/
+[BSP build complete]
+[game build complete]
